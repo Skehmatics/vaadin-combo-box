@@ -61,7 +61,7 @@
       hasValue: {
         type: Boolean,
         value: false,
-        readonly: true,
+        readOnly: true,
         reflectToAttribute: true
       },
 
@@ -105,6 +105,9 @@
        *
        * The item label is also used for matching items when processing user
        * input, i.e., for filtering and selecting items.
+       *
+       * When using item templates, the property is still needed because it is used
+       * for filtering, and for displaying the selected item value in the input box.
        */
       itemLabelPath: {
         type: String,
@@ -139,7 +142,9 @@
       _closeOnBlurIsPrevented: Boolean,
 
       _templatized: Boolean,
-      _itemTemplate: Boolean
+      _itemTemplate: Boolean,
+
+      _previousDocumentPointerEvents: String
     },
 
     observers: [
@@ -364,6 +369,11 @@
       this.$.overlay.updateViewportBoundaries();
       this.$.overlay.async(this.$.overlay.adjustScrollPosition);
       this.$.overlay.async(this.$.overlay.notifyResize, 1);
+
+      // Set body pointer-events to 'none' to disable mouse interactions with
+      // other document nodes (combo-box is "modal")
+      this._previousDocumentPointerEvents = document.body.style.pointerEvents;
+      document.body.style.pointerEvents = 'none';
     },
 
     _onClosed: function() {
@@ -392,6 +402,8 @@
       this._clearSelectionRange();
 
       this.filter = '';
+
+      document.body.style.pointerEvents = this._previousDocumentPointerEvents;
     },
 
     /**
@@ -466,7 +478,7 @@
           this.value = '';
         }
 
-        this.hasValue = this.value !== '';
+        this._setHasValue(this.value !== '');
         this._inputElementValue = this.value;
       } else {
         var value = this._getItemValue(selectedItem);
@@ -474,7 +486,7 @@
           this.value = value;
         }
 
-        this.hasValue = true;
+        this._setHasValue(true);
         this._inputElementValue = this._getItemLabel(selectedItem);
       }
 
@@ -495,7 +507,7 @@
           this._inputElementValue = value;
         }
 
-        this.hasValue = this.value !== '';
+        this._setHasValue(this.value !== '');
       } else {
         this.selectedItem = null;
       }
@@ -638,6 +650,24 @@
       Array.prototype.forEach.call(items, function(item) {
         item._itemTemplateInstance.notifyPath(path, value, true);
       });
+    },
+
+    _preventInputBlur: function() {
+      if (this._toggleElement) {
+        this.listen(this._toggleElement, 'down', '_preventDefault');
+      }
+      if (this._clearElement) {
+        this.listen(this._clearElement, 'down', '_preventDefault');
+      }
+    },
+
+    _restoreInputBlur: function() {
+      if (this._toggleElement) {
+        this.unlisten(this._toggleElement, 'down', '_preventDefault');
+      }
+      if (this._clearElement) {
+        this.unlisten(this._clearElement, 'down', '_preventDefault');
+      }
     },
 
     _preventDefault: function(e) {
